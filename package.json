@@ -1,0 +1,26 @@
+{
+  "name": "cvd",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node --watch server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@faker-js/faker": "^8.0.2",
+    "@tensorflow/tfjs": "^4.7.0",
+    "csv-parser": "^3.0.0",
+    "json-2-csv": "^4.0.0",
+    "json-server": "^0.17.3",
+    "json2csv": "^6.0.0-alpha.2",
+    "ml-regression": "^5.0.0",
+    "mysql2": "^3.4.0",
+    "svd-js": "^1.1.1",
+    "tensorflow.js": "^0.0.0"
+  }
+}
