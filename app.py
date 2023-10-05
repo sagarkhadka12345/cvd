@@ -11,7 +11,7 @@ import re
 import ast
 import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 
-from flask import Flask
+from flask import Flask, jsonify
 
 
 
@@ -177,7 +177,7 @@ similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
 def generate_recommendations(similarity_matrix, movie_id, top_k):
     # Find the index of the movie with the given title
     movie_index = new[new['movie_id'] == movie_id].index[0]
-    print(movie_index)
+   
     # Get the similarity scores for the movie
     movie_scores = similarity_matrix[movie_index]
 
@@ -189,8 +189,8 @@ def generate_recommendations(similarity_matrix, movie_id, top_k):
     # Select the top k recommendations
     top_recommendations = list(
         zip(sorted_titles[:top_k], sorted_scores[:top_k]))
-
-    return top_recommendations
+    ids = [int(item[0]) for item in top_recommendations]
+    return ids
 
 
 # Generate recommendations for a movie
@@ -201,6 +201,7 @@ recommendations = generate_recommendations(similarity_matrix, 137106, 5)
 
 app = Flask(__name__)
 
-@app.route("/<int:movie_id>")
+@app.route("/video/<int:movie_id>", methods= ["GET"])
 def hello_world(movie_id):
-    return generate_recommendations(similarity_matrix, movie_id, 5)
+     print(generate_recommendations(similarity_matrix, movie_id, 5))
+     return jsonify( generate_recommendations(similarity_matrix, movie_id, 5))
