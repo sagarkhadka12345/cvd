@@ -260,49 +260,84 @@ import random
 items = recommendations_cosine
 print(items)
 # Define the number of synthetic users and the desired interaction rate
-num_users = 100
-interaction_rate = .9  # Adjust as needed (percentage of interactions)
+# num_users = 100
+# interaction_rate = .9  # Adjust as needed (percentage of interactions)
 
-# Create an empty dictionary to store synthetic interactions
-synthetic_interactions = {}
+# # Create an empty dictionary to store synthetic interactions
+# synthetic_interactions = {}
+
+# # Generate synthetic interactions for each user
+# for user_id in range(1, num_users + 1):
+#     # Randomly choose the number of interactions for this user
+#     num_interactions = int(len(items) * interaction_rate)
+#     print(num_interactions , items)
+#     # Randomly sample items for interactions
+#     user_interactions = random.sample(items, num_interactions)
+    
+#     # Store the interactions for this user in the dictionary
+#     synthetic_interactions[f"user{user_id}"] = user_interactions
+
+# # Print the synthetic interactions
+# for user_id, interactions in synthetic_interactions.items():
+#     print(f"User {user_id} interactions: {interactions}")
+    
+num_users = 100
+num_items = 500
+
+# Define the interaction rate (e.g., 0.2 for 20% interactions per user)
+interaction_rate = 0.2
+
+# Initialize a list to store synthetic interactions
+synthetic_interactions = []
 
 # Generate synthetic interactions for each user
 for user_id in range(1, num_users + 1):
     # Randomly choose the number of interactions for this user
-    num_interactions = int(len(items) * interaction_rate)
-    print(num_interactions , items)
-    # Randomly sample items for interactions
-    user_interactions = random.sample(items, num_interactions)
+    num_interactions = int(num_items * interaction_rate)
     
-    # Store the interactions for this user in the dictionary
-    synthetic_interactions[f"user{user_id}"] = user_interactions
-
-
+    # Randomly sample items for interactions (using item IDs)
+    user_interactions = random.sample(range(1, num_items + 1), num_interactions)
     
+    # Append the user's interactions to the list
+    synthetic_interactions.append(user_interactions)
+
+# Print the synthetic interactions
+for user_id, interactions in enumerate(synthetic_interactions, start=1):
+    print(f"User {user_id} interactions: {interactions}")
+
 
 # Assuming 'synthetic_interactions' is a dictionary of synthetic user interactions
 # 'recommended_items' is a dictionary of recommended items where keys are user IDs and values are lists of recommended item IDs.
 
-precision_sum = 0
+total_average_precision = 0
 total_users = len(synthetic_interactions)
 
-for user_id, synthetic_interactions_list in synthetic_interactions.items():
-    actual_interactions_set = set(synthetic_interactions_list)
-    recommended_items_list = synthetic_interactions.get(user_id, [])
-    
-    # Calculate precision for this user
-    num_relevant_recommendations = len(set(recommended_items_list).intersection(actual_interactions_set))
-    total_recommendations = len(recommended_items_list)
-    
-    if total_recommendations > 0:
-        precision = num_relevant_recommendations / total_recommendations
-        precision_sum += precision
+# Iterate through each user (assuming each inner list represents a user's interactions)
+for i in range(total_users):
+    actual_interactions_list = synthetic_interactions[i]
+    recommended_video_ids = recommendations_cosine[i]
 
-# Calculate the average precision across all users
-average_precision = precision_sum / total_users
+    # Initialize variables for this user's AP calculation
+    num_relevant_recommendations = 0
+    precision_sum = 0
 
-print("Average Precision:", average_precision)
+    # Calculate Average Precision (AP) for this user
+    for j, recommended_video_id in enumerate(recommended_video_ids):
+        if recommended_video_id in actual_interactions_list:
+            num_relevant_recommendations += 1
+            precision = num_relevant_recommendations / (j + 1)
+            precision_sum += precision
 
+    # Calculate the Average Precision (AP) for this user
+    if num_relevant_recommendations > 0:
+        average_precision = precision_sum / num_relevant_recommendations
+        total_average_precision += average_precision
+
+# Calculate the Mean Average Precision (MAP) for the entire dataset
+mean_average_precision = total_average_precision / total_users
+
+# Print the Mean Average Precision (MAP)
+print("Mean Average Precision (MAP):", mean_average_precision)
 accuracy = np.corrcoef(recommendations, recommendations_cosine)[0, 1]
 
 print(f"Accuracy: {accuracy:.2f}%")
