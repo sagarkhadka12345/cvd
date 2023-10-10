@@ -28,8 +28,11 @@ movies = movies.merge(credits, on='title')
 
 movies.head()
 
+
 movies = movies[['movie_id', 'title', 'overview',
-                 'subject', 'keywords', 'cast', 'crew']]
+                 'subject', 'keywords', 'cast', 'crew',
+                   'homepage', 'tagline', 'vote_count','orginal_language',
+                   'orginal_title','spoken_languages','status','vote_average']]
 
 movies.head()
 
@@ -105,14 +108,16 @@ movies.head()
 movies['overview'] = movies['overview'].apply(lambda x: x.split())
 
 movies['tags'] = movies['overview'] + movies['subject'] + \
-    movies['keywords'] + movies['cast'] + movies['crew']
+    movies['keywords'] + movies['cast'] + movies['crew'] + movies['homepage'] +\
+    movies['orginal_language'] + movies['orginal_title'] + movies['spoken_languages'] + movies['status'] +\
+    movies["tagline"] + movies["vote_count"].astype(str) + movies["vote_average"].astype(str)
 
 new = movies
 # new.head()
 
 new['tags'] = new['tags'].apply(lambda x: " ".join(x))
 new.head()
-print(new['tags'][0])
+
 
 
 class CountVectorizer:
@@ -196,7 +201,7 @@ cvd = CountVectorizerJaccard()
 
 # Fit the vectorizer on the 'tags' column of the 'new' DataFrame
 tfidf_matrix = cv.fit_transform(new['tags'] )
-tfidf_matrixj = cvd.fit_transform(new['tags'])
+tfidf_matrixj = cv.fit_transform(new.apply(lambda x: ' '.join(x.astype(str)), axis=1))
 
 
 # Compute Pearson similarity matrix
@@ -241,14 +246,13 @@ from scipy.spatial import distance
 recommendations_cosine = np.array(recommendations_cosine)
 
 recommendations_p = np.array(recommendations_p)
-print(generate_recommendations(similarity_matrix, 1893, 5))
+print(generate_recommendations(similarity_matrix, 333355, 5))
 
-# print(recommendations_cosine)
-# print(recommendations_p)
+
 # Calculate Pearson correlation coefficient
 pearson_similarity = np.corrcoef(recommendations_cosine, recommendations_p)[0, 1]
 
-
+print("Pearson Correlation Coefficient:", pearson_similarity)
 
 
 
