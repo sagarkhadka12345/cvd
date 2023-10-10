@@ -1,5 +1,6 @@
 
 
+import pandas as pd
 from scipy.spatial import distance
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -183,6 +184,80 @@ class CountVectorizerJaccard:
         return tokens
 
 
+class CountVectorizerJaccardMultiColumn:
+    def __init__(self, lowercase=True, token_pattern=r"(?u)\b\w\w+\b", column_weights={}):
+        self.lowercase = lowercase
+        self.token_pattern = token_pattern
+        self.vocabulary = defaultdict(int)
+        self.column_weights = column_weights if column_weights else {}
+        self.stop_words = set({"death", "foreign", "sextrafficking"})
+
+    def fit_transform(self, df):
+        self.fit(df)
+        return self.transform(df)
+
+    def fit(self, df):
+        for _, row in df.iterrows():
+            for doc in row:
+                tokens = self._tokenize(doc)
+                for token in tokens:
+                    if row in self.column_weights:
+                        self.vocabulary[token] += self.column_weights[row]
+                    else:
+                        self.vocabulary[token] += 1
+
+    def transform(self, df):
+        rows, cols, data = [], [], []
+        for i, row in df.iterrows():
+            for col, weight in self.column_weights.items():
+                text = row[col]
+                tokens = self._tokenize(text)
+                for token in tokens:
+                    if token in self.vocabulary and token not in self.stop_words:
+                        # Check if i is a valid row index
+                        if i < len(df):
+                            rows.append(i)
+                            cols.append(self.vocabulary[token])
+                            data.append(weight)
+                        else:
+                            print(f"Invalid row index: {i}")
+        X = csr_matrix((data, (rows, cols)), shape=(
+            len(df), len(self.vocabulary)))
+        return X
+
+    def _tokenize(self, text):
+        if isinstance(text, str):
+            if self.lowercase:
+                text = text.lower()
+            tokens = re.findall(self.token_pattern, text)
+        elif isinstance(text, list):
+            tokens = []
+            for item in text:
+                if isinstance(item, str):
+                    if self.lowercase:
+                        item = item.lower()
+                    tokens.extend(re.findall(self.token_pattern, item))
+        else:
+            tokens = []
+        return tokens
+# Example usage:
+# Create a DataFrame with multiple columns
+
+
+# Example usage:
+# Create a DataFrame with multiple columns
+
+
+df = pd.DataFrame(movies)
+
+# Define column weights (adjust as needed)
+column_weights = {'cast': 1, 'crew': 1, 'tags': 1, 'keywords': 1, 'subject': 1}
+
+# Initialize and use CountVectorizerJaccardMultiColumn
+vectorizer = CountVectorizerJaccardMultiColumn()
+X = vectorizer.fit_transform(df)
+
+
 cv = CountVectorizer()
 cvd = CountVectorizerJaccard()
 
@@ -195,10 +270,10 @@ tfidf_matrixj = cv.fit_transform(
 
 # Compute Pearson similarity matrix
 
-similarity_matrix_p = cosine_similarity(tfidf_matrixj, tfidf_matrixj)
+similarity_matrix = cosine_similarity(X, X)
 
 # Calculate the cosine similarity matrix
-similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
+similarity_matrix_p = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
 
 def generate_recommendations(similarity_matrix, movie_id, top_k):
@@ -231,7 +306,6 @@ recommendations_p = generate_recommendations(similarity_matrix_p, 137106, 50)
 recommendations_cosine = np.array(recommendations_cosine)
 
 recommendations_p = np.array(recommendations_p)
-print(generate_recommendations(similarity_matrix, 333355, 5))
 
 
 # Calculate Pearson correlation coefficient
