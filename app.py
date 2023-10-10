@@ -36,9 +36,6 @@ movies = movies[['movie_id', 'title', 'overview',
 
 movies.head()
 
-
-
-
 def convert(text):
     L = []
     for i in ast.literal_eval(text):
@@ -106,11 +103,12 @@ movies['keywords'] = movies['keywords'].apply(collapse)
 movies.head()
 
 movies['overview'] = movies['overview'].apply(lambda x: x.split())
+columns_to_concat = ['overview', 'subject', 'keywords', 'cast', 'crew', 'original_language',
+                     'original_title', 'spoken_languages', 'status', 'tagline']
 
-movies['tags'] = movies['overview'] + movies['subject'] + \
-    movies['keywords'] + movies['cast'] + movies['crew'] + movies['homepage'] +\
-    movies['orginal_language'] + movies['orginal_title'] + movies['spoken_languages'] + movies['status'] +\
-    movies["tagline"] + movies["vote_count"].astype(str) + movies["vote_average"].astype(str)
+# Concatenate selected columns, handling missing values and type conversion
+movies['tags'] = movies[columns_to_concat].fillna('').astype(str).agg(' '.join, axis=1)
+movies['tags'] += ' ' + movies['vote_count'].astype(str) + ' ' + movies['vote_average'].astype(str)
 
 new = movies
 # new.head()
