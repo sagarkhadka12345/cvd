@@ -1,7 +1,6 @@
 
 
-
-
+from scipy.spatial import distance
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 from scipy.sparse import csr_matrix
@@ -12,7 +11,6 @@ import ast
 import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 
 from flask import Flask, jsonify
-
 
 
 movies = pd.read_csv('./videos.csv')
@@ -30,11 +28,9 @@ movies.head()
 
 
 movies = movies[['movie_id', 'title', 'overview',
-                 'subject', 'keywords', 'cast', 'crew',
-                   'homepage', 'tagline', 'vote_count','orginal_language',
-                   'orginal_title','spoken_languages','status','vote_average']]
-
+                 'subject', 'keywords', 'cast', 'crew']]
 movies.head()
+
 
 def convert(text):
     L = []
@@ -49,11 +45,11 @@ movies['subject'] = movies['subject'].apply(convert)
 movies.head()
 
 movies['keywords'] = movies['keywords'].apply(convert)
+
 movies.head()
 
 ast.literal_eval(
     '[{"id": 28, "name": "Action"}, {"id": 12, "name": "Adventure"}, {"id": 14, "name": "Fantasy"}, {"id": 878, "name": "Science Fiction"}]')
-
 
 
 def convert3(text):
@@ -72,7 +68,6 @@ movies.head()
 movies['cast'] = movies['cast'].apply(lambda x: x[0:3])
 
 
-
 def fetch_director(text):
     L = []
     for i in ast.literal_eval(text):
@@ -85,7 +80,6 @@ movies['crew'] = movies['crew'].apply(fetch_director)
 
 # movies['overview'] = movies['overview'].apply(lambda x:x.split())
 movies.sample(5)
-
 
 
 def collapse(L):
@@ -103,19 +97,16 @@ movies['keywords'] = movies['keywords'].apply(collapse)
 movies.head()
 
 movies['overview'] = movies['overview'].apply(lambda x: x.split())
-columns_to_concat = ['overview', 'subject', 'keywords', 'cast', 'crew', 'original_language',
-                     'original_title', 'spoken_languages', 'status', 'tagline']
 
-# Concatenate selected columns, handling missing values and type conversion
-movies['tags'] = movies[columns_to_concat].fillna('').astype(str).agg(' '.join, axis=1)
-movies['tags'] += ' ' + movies['vote_count'].astype(str) + ' ' + movies['vote_average'].astype(str)
+movies['tags'] = movies['overview'] + movies['subject'] + \
+    movies['keywords'] + movies['cast'] + movies['crew']
+
 
 new = movies
 # new.head()
 
 new['tags'] = new['tags'].apply(lambda x: " ".join(x))
 new.head()
-
 
 
 class CountVectorizer:
@@ -133,7 +124,7 @@ class CountVectorizer:
         for doc in raw_documents:
             tokens = self._tokenize(doc)
             for token in tokens:
-                self.vocabulary[token] += 1 
+                self.vocabulary[token] += 1
 
     def transform(self, raw_documents):
         rows, cols, data = [], [], []
@@ -154,6 +145,7 @@ class CountVectorizer:
         tokens = re.findall(self.token_pattern, text)
         return tokens
 
+
 class CountVectorizerJaccard:
     def __init__(self, lowercase=True, token_pattern=r"(?u)\b\w\w+\b"):
         self.lowercase = lowercase
@@ -169,7 +161,7 @@ class CountVectorizerJaccard:
         for doc in raw_documents:
             tokens = self._tokenize(doc)
             for token in tokens:
-                self.vocabulary[token] += 1.25 
+                self.vocabulary[token] += 1.25
 
     def transform(self, raw_documents):
         rows, cols, data = [], [], []
@@ -190,16 +182,15 @@ class CountVectorizerJaccard:
         tokens = re.findall(self.token_pattern, text)
         return tokens
 
+
 cv = CountVectorizer()
 cvd = CountVectorizerJaccard()
 
 
-
-
-
 # Fit the vectorizer on the 'tags' column of the 'new' DataFrame
-tfidf_matrix = cv.fit_transform(new['tags'] )
-tfidf_matrixj = cv.fit_transform(new.apply(lambda x: ' '.join(x.astype(str)), axis=1))
+tfidf_matrix = cv.fit_transform(new['tags'])
+tfidf_matrixj = cv.fit_transform(
+    new['tags'])
 
 
 # Compute Pearson similarity matrix
@@ -213,7 +204,7 @@ similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
 def generate_recommendations(similarity_matrix, movie_id, top_k):
     # Find the index of the movie with the given title
     movie_index = new[new['movie_id'] == movie_id].index[0]
-   
+
     # Get the similarity scores for the movie
     movie_scores = similarity_matrix[movie_index]
 
@@ -226,19 +217,15 @@ def generate_recommendations(similarity_matrix, movie_id, top_k):
     top_recommendations = list(
         zip(sorted_titles[:top_k], sorted_scores[:top_k]))
     ids = [int(item[0]) for item in top_recommendations]
-    
+
     return ids
 
 
-
-
-
 # Generate recommendations for a movie
-recommendations_cosine = generate_recommendations(similarity_matrix, 137106, 50)
+recommendations_cosine = generate_recommendations(
+    similarity_matrix, 137106, 50)
 recommendations_p = generate_recommendations(similarity_matrix_p, 137106, 50)
 
-import numpy as np
-from scipy.spatial import distance
 
 # Convert your arrays to NumPy arrays
 recommendations_cosine = np.array(recommendations_cosine)
@@ -248,16 +235,16 @@ print(generate_recommendations(similarity_matrix, 333355, 5))
 
 
 # Calculate Pearson correlation coefficient
-pearson_similarity = np.corrcoef(recommendations_cosine, recommendations_p)[0, 1]
+pearson_similarity = np.corrcoef(
+    recommendations_cosine, recommendations_p)[0, 1]
 
 print("Pearson Correlation Coefficient:", pearson_similarity)
 
 
-
-
 app = Flask(__name__)
 
-@app.route("/video/<int:movie_id>", methods= ["GET"])
+
+@app.route("/video/<int:movie_id>", methods=["GET"])
 def hello_world(movie_id):
-     print(generate_recommendations(similarity_matrix, movie_id, 5))
-     return jsonify( generate_recommendations(similarity_matrix, movie_id, 5))
+    print(generate_recommendations(similarity_matrix, movie_id, 5))
+    return jsonify(generate_recommendations(similarity_matrix, movie_id, 5))
