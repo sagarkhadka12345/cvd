@@ -112,7 +112,7 @@ new = movies
 
 new['tags'] = new['tags'].apply(lambda x: " ".join(x))
 new.head()
-
+print(new['tags'][0])
 
 
 class CountVectorizer:
@@ -130,7 +130,7 @@ class CountVectorizer:
         for doc in raw_documents:
             tokens = self._tokenize(doc)
             for token in tokens:
-                self.vocabulary[token] += 1
+                self.vocabulary[token] += 1 
 
     def transform(self, raw_documents):
         rows, cols, data = [], [], []
@@ -151,27 +151,60 @@ class CountVectorizer:
         tokens = re.findall(self.token_pattern, text)
         return tokens
 
+class CountVectorizerJaccard:
+    def __init__(self, lowercase=True, token_pattern=r"(?u)\b\w\w+\b"):
+        self.lowercase = lowercase
+        self.token_pattern = token_pattern
+        self.vocabulary = defaultdict(int)
+        self.stop_words = set({"death", "foreign", "sextrafficking"})
+
+    def fit_transform(self, raw_documents):
+        self.fit(raw_documents)
+        return self.transform(raw_documents)
+
+    def fit(self, raw_documents):
+        for doc in raw_documents:
+            tokens = self._tokenize(doc)
+            for token in tokens:
+                self.vocabulary[token] += 1.25 
+
+    def transform(self, raw_documents):
+        rows, cols, data = [], [], []
+        for i, doc in enumerate(raw_documents):
+            tokens = self._tokenize(doc)
+            for token in tokens:
+                if token in self.vocabulary and token not in self.stop_words:
+                    rows.append(i)
+                    cols.append(self.vocabulary[token])
+                    data.append(1.2)
+        X = csr_matrix((data, (rows, cols)), shape=(
+            len(raw_documents), len(self.vocabulary)))
+        return X
+
+    def _tokenize(self, text):
+        if self.lowercase:
+            text = text.lower()
+        tokens = re.findall(self.token_pattern, text)
+        return tokens
 
 cv = CountVectorizer()
-
-new
-
-vector = cv.fit_transform(new['tags']).toarray()
-vector
-
-vector.shape
+cvd = CountVectorizerJaccard()
 
 
-# Create a TF-IDF vectorizer
-vectorizer = TfidfVectorizer()
+
+
 
 # Fit the vectorizer on the 'tags' column of the 'new' DataFrame
-tfidf_matrix = vectorizer.fit_transform(new['tags'])
+tfidf_matrix = cv.fit_transform(new['tags'] )
+tfidf_matrixj = cvd.fit_transform(new['tags'])
+
+
+# Compute Pearson similarity matrix
+
+similarity_matrix_p = cosine_similarity(tfidf_matrixj, tfidf_matrixj)
 
 # Calculate the cosine similarity matrix
 similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
-
-# Function to generate recommendations
 
 
 def generate_recommendations(similarity_matrix, movie_id, top_k):
@@ -190,11 +223,32 @@ def generate_recommendations(similarity_matrix, movie_id, top_k):
     top_recommendations = list(
         zip(sorted_titles[:top_k], sorted_scores[:top_k]))
     ids = [int(item[0]) for item in top_recommendations]
+    
     return ids
 
 
+
+
+
 # Generate recommendations for a movie
-recommendations = generate_recommendations(similarity_matrix, 137106, 5)
+recommendations_cosine = generate_recommendations(similarity_matrix, 137106, 50)
+recommendations_p = generate_recommendations(similarity_matrix_p, 137106, 50)
+
+import numpy as np
+from scipy.spatial import distance
+
+# Convert your arrays to NumPy arrays
+recommendations_cosine = np.array(recommendations_cosine)
+
+recommendations_p = np.array(recommendations_p)
+print(generate_recommendations(similarity_matrix, 1893, 5))
+
+# print(recommendations_cosine)
+# print(recommendations_p)
+# Calculate Pearson correlation coefficient
+pearson_similarity = np.corrcoef(recommendations_cosine, recommendations_p)[0, 1]
+
+
 
 
 
