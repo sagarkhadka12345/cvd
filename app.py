@@ -165,15 +165,71 @@ vector.shape
 # Create a TF-IDF vectorizer
 vectorizer = TfidfVectorizer()
 
+
+
 # Fit the vectorizer on the 'tags' column of the 'new' DataFrame
 tfidf_matrix = vectorizer.fit_transform(new['tags'])
+
+
+num_docs, num_terms = tfidf_matrix.shape
+document_sets = []
+
+for i in range(num_docs):
+    # Get the non-zero indices (terms with non-zero TF-IDF values)
+    non_zero_indices = np.nonzero(tfidf_matrix[i])[1]
+    # Create a set of terms for the document
+    document_set = set(non_zero_indices)
+    document_sets.append(document_set)
+
+
+ # Since Jaccard similarity is symmetric
+def jaccard_similarity(set1, set2):
+    intersection = len(set1 & set2)
+    union = len(set1 | set2)
+    return intersection / union
+
+# Calculate Jaccard similarities between documents
+num_docs = len(document_sets)
+jaccard_similarities = np.zeros((num_docs, num_docs))
+
+for i in range(num_docs):
+    for j in range(i, num_docs):
+        jaccard_similarities[i, j] = jaccard_similarity(document_sets[i], document_sets[j])
+        jaccard_similarities[j, i] = jaccard_similarities[i, j]
+# Print the Jaccard similarities
+
 
 # Calculate the cosine similarity matrix
 similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
 # Function to generate recommendations
+print(tfidf_matrix)
+mean_tfidf = np.mean(tfidf_matrix, axis=1)
+
+# Ensure that 'mean_tfidf' is a 1D array (vector)
+mean_tfidf = np.mean(tfidf_matrix, axis=1)
+mean_tfidf = mean_tfidf.ravel()  # Ensure it's a 1D array
+
+# Ensure 'mean_tfidf' has the same number of rows as 'tfidf_matrix'
+mean_tfidf = mean_tfidf.reshape(-1, 1)
 
 
+# Subtract the mean from each document's TF-IDF values
+centered_tfidf = tfidf_matrix - mean_tfidf
+
+# Calculate the Pearson Correlation Coefficient (PCC) similarity matrix
+
+print("Shape of tfidf_matrix:", tfidf_matrix.shape)
+print("Shape of mean_tfidf:", mean_tfidf.shape)
+print("Data type of tfidf_matrix:", tfidf_matrix.dtype)
+print("Data type of mean_tfidf:", mean_tfidf.dtype)
+# Subtract the mean from each document's TF-IDF values
+
+
+# Calculate the Pearson Correlation Coefficient (PCC) similarity matrix
+pcc_similarity_matrix = np.corrcoef(centered_tfidf)
+# print(similarity_matrix)
+# print(pcc_similarity_matrix)
 def generate_recommendations(similarity_matrix, movie_id, top_k):
     # Find the index of the movie with the given title
     movie_index = new[new['movie_id'] == movie_id].index[0]
@@ -194,14 +250,66 @@ def generate_recommendations(similarity_matrix, movie_id, top_k):
 
 
 # Generate recommendations for a movie
-recommendations = generate_recommendations(similarity_matrix, 137106, 5)
+recommendations = generate_recommendations(pcc_similarity_matrix, 137106, 50)
+recommendations_cosine = generate_recommendations(similarity_matrix, 137106, 50)
 
 
+import random
 
+# Define a list of items (e.g., item IDs or item features)
+items = recommendations_cosine
+print(items)
+# Define the number of synthetic users and the desired interaction rate
+num_users = 100
+interaction_rate = .9  # Adjust as needed (percentage of interactions)
+
+# Create an empty dictionary to store synthetic interactions
+synthetic_interactions = {}
+
+# Generate synthetic interactions for each user
+for user_id in range(1, num_users + 1):
+    # Randomly choose the number of interactions for this user
+    num_interactions = int(len(items) * interaction_rate)
+    print(num_interactions , items)
+    # Randomly sample items for interactions
+    user_interactions = random.sample(items, num_interactions)
+    
+    # Store the interactions for this user in the dictionary
+    synthetic_interactions[f"user{user_id}"] = user_interactions
+
+
+    
+
+# Assuming 'synthetic_interactions' is a dictionary of synthetic user interactions
+# 'recommended_items' is a dictionary of recommended items where keys are user IDs and values are lists of recommended item IDs.
+
+precision_sum = 0
+total_users = len(synthetic_interactions)
+
+for user_id, synthetic_interactions_list in synthetic_interactions.items():
+    actual_interactions_set = set(synthetic_interactions_list)
+    recommended_items_list = synthetic_interactions.get(user_id, [])
+    
+    # Calculate precision for this user
+    num_relevant_recommendations = len(set(recommended_items_list).intersection(actual_interactions_set))
+    total_recommendations = len(recommended_items_list)
+    
+    if total_recommendations > 0:
+        precision = num_relevant_recommendations / total_recommendations
+        precision_sum += precision
+
+# Calculate the average precision across all users
+average_precision = precision_sum / total_users
+
+print("Average Precision:", average_precision)
+
+accuracy = np.corrcoef(recommendations, recommendations_cosine)[0, 1]
+
+print(f"Accuracy: {accuracy:.2f}%")
 
 app = Flask(__name__)
 
 @app.route("/video/<int:movie_id>", methods= ["GET"])
 def hello_world(movie_id):
      print(generate_recommendations(similarity_matrix, movie_id, 5))
-     return jsonify( generate_recommendations(similarity_matrix, movie_id, 5))
+     return jsonify(generate_recommendations(similarity_matrix, movie_id, 5))
