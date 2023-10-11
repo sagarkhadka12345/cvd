@@ -485,8 +485,6 @@ movies
 # Compute Pearson similarity matrix
 
 
-# %%
-# similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
 similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
 
