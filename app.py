@@ -13,18 +13,30 @@ import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 
 from flask import Flask, jsonify
 
+import pymysql
 
-movies = pd.read_csv('./videos.csv')
-credits = pd.read_csv('./credits.csv')
+host = 'localhost'
+user = 'root'
+password = ''
+database = 'cvd'
 
+connection = pymysql.connect(
+    host=host, user=user, password=password, database=database)
+query = 'SELECT * FROM videos'
+querycredits = 'SELECT * FROM credits'
+moviess = pd.read_csv('./videos.csv')
+creditss = pd.read_csv('./credits.csv')
+
+movies = pd.read_sql(query, connection)
 movies.head(2)
 
 movies.shape
 
+credits = pd.read_sql(querycredits, connection)
 credits.head()
 
 movies = movies.merge(credits, on='title')
-
+movies['movie_id'] = movies['id']
 movies.head()
 
 
@@ -149,11 +161,7 @@ class CountVectorizerNormal:
             text = text.lower()
         tokens = re.findall(self.token_pattern, text)
         return tokens
-    
 
-from collections import defaultdict
-import re
-from scipy.sparse import csr_matrix
 
 class CountVectorizer:
     def __init__(self, lowercase=True, token_pattern=r"(?u)\b\w\w+\b", column_weights=None, spx=0):
@@ -180,7 +188,7 @@ class CountVectorizer:
             tokens = self._tokenize(doc)
             for token in tokens:
                 if token in self.vocabulary and token not in self.stop_words:
-                    weight = self.column_weights.get(token, self.spx) 
+                    weight = self.column_weights.get(token, self.spx)
                     rows.append(i)
                     cols.append(self.vocabulary[token])
                     data.append(weight)
@@ -299,15 +307,17 @@ class CountVectorizerJaccard:
 df = pd.DataFrame(movies)
 
 # Define column weights (adjust as needed)
-column_weights = {'cast': 1.1, 'crew': 1.4, 'tags': 1.2, 'keywords': 1.2, 'subject': 3, "overview":1}
-column_weights_main = {'cast': .2, 'crew': 1, 'tags': 1.5, 'keywords': 1.1, 'subject': .9, "overview":1}
+column_weights = {'cast': 1.1, 'crew': 1.4, 'tags': 1.2,
+                  'keywords': 1.2, 'subject': 3, "overview": 1}
+column_weights_main = {'cast': .2, 'crew': 1, 'tags': 1.5,
+                       'keywords': 1.1, 'subject': .9, "overview": 1}
 
 # # Initialize and use CountVectorizerJaccardMultiColumn
 # vectorizer = CountVectorizerJaccardMultiColumn()
 # X = vectorizer.fit_transform(df)
 
 
-cv = CountVectorizer(column_weights=column_weights, spx =.9)
+cv = CountVectorizer(column_weights=column_weights, spx=.9)
 cvn = CountVectorizer(column_weights=column_weights_main, spx=.7)
 cvd = CountVectorizerJaccard()
 
@@ -316,7 +326,7 @@ print(movies)
 
 # Fit the vectorizer on the 'tags' column of the 'new' DataFrame
 tfidf_matrix = cv.fit_transform(new["tags"])
-tfidf_matrixn = cvn.fit_transform(new["tags"]  )
+tfidf_matrixn = cvn.fit_transform(new["tags"])
 tfidf_matrixj = cv.fit_transform(
     new["tags"])
 
@@ -337,7 +347,6 @@ for i in range(num_docs):
     # Create a set of terms for the document
     document_set = set(non_zero_indices)
     document_sets.append(document_set)
-
 
  # Since Jaccard similarity is symmetric
 # def jaccard_similarity(set1, set2):
@@ -434,14 +443,14 @@ print("Pearson Correlation Coefficient:", pearson_similarity)
 #     print(num_interactions , items)
 #     # Randomly sample items for interactions
 #     user_interactions = random.sample(items, num_interactions)
-    
+
 #     # Store the interactions for this user in the dictionary
 #     synthetic_interactions[f"user{user_id}"] = user_interactions
 
 # # Print the synthetic interactions
 # for user_id, interactions in synthetic_interactions.items():
 #     print(f"User {user_id} interactions: {interactions}")
-    
+
 num_users = 100
 num_items = 500
 
@@ -455,10 +464,10 @@ interaction_rate = 0.2
 # for user_id in range(1, num_users + 1):
 #     # Randomly choose the number of interactions for this user
 #     num_interactions = int(num_items * interaction_rate)
-    
+
 #     # Randomly sample items for interactions (using item IDs)
 #     user_interactions = random.sample(range(1, num_items + 1), num_interactions)
-    
+
 #     # Append the user's interactions to the list
 #     synthetic_interactions.append(user_interactions)
 
