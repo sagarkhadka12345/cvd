@@ -2,3 +2,6 @@ __pycache__
 *.venv
 /myenv
 /myenv/.*
+/Lib
+/Scripts
+/Include

@@ -13,25 +13,47 @@ import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 
 from flask import Flask, jsonify
 
+import pymysql
+# movies = pd.read_csv('./videos.csv')
+# credits = pd.read_csv('./credits.csv')
 
-movies = pd.read_csv('./videos.csv')
-credits = pd.read_csv('./credits.csv')
 
+
+host = 'localhost'
+user = 'root'
+password = ''
+database = 'cvd'
+connection = pymysql.connect(
+    host=host, user=user, password=password, database=database)
+query = 'SELECT * FROM `videos` ORDER BY `release_date` DESC'
+querycredits = 'SELECT * FROM credits'
+
+
+movies = pd.read_sql(query, connection)
+movies.head(2)
+
+movies.shape
 movies.head(2)
 
 movies.shape
 
-credits.head()
 
-movies = movies.merge(credits, on='title')
+
 
 movies.head()
 
+credits = pd.read_sql(querycredits, connection)
 
+print(movies)
+
+movies = movies.merge(credits, on='title', how='left')
+movies.fillna('', inplace=True)
+
+print(movies["movie_id"])
+movies['movie_id'] = movies['id']
 movies = movies[['movie_id', 'title', 'overview',
                  'subject', 'keywords', 'cast', 'crew']]
 movies.head()
-
 
 def convert(text):
     L = []
@@ -48,9 +70,6 @@ movies.head()
 movies['keywords'] = movies['keywords'].apply(convert)
 
 movies.head()
-
-ast.literal_eval(
-    '[{"id": 28, "name": "Action"}, {"id": 12, "name": "Adventure"}, {"id": 14, "name": "Fantasy"}, {"id": 878, "name": "Science Fiction"}]')
 
 
 def convert3(text):
@@ -77,7 +96,7 @@ def fetch_director(text):
     return L
 
 
-movies['crew'] = movies['crew'].apply(fetch_director)
+# movies['crew'] = movies['crew'].apply(fetch_director)
 
 # movies['overview'] = movies['overview'].apply(lambda x:x.split())
 movies.sample(5)
@@ -119,7 +138,7 @@ movies['crew']= movies['crew'].apply(lambda x: " ".join(x))
 
 new = movies
 # new.head()
-new
+
 
 
 
@@ -195,7 +214,7 @@ class CountVectorizerAllColumns:
 
 
 # %%
-df = pd.DataFrame(movies)
+df = pd.DataFrame(mv)
 
 
 column_weights_main = {'cast': 1.197, 'crew': 1.3, 'tags': 1.2, 'keywords': 1.1, 'subject': 1, "overview":1}
@@ -207,7 +226,7 @@ cvn = CountVectorizerAllColumns(column_weights=column_weights_main)
 
 # 
 
-
+print(mv)
 
 # Fit the vectorizer on the 'tags' column of the 'new' DataFrame
 
@@ -241,31 +260,31 @@ def generate_recommendations(similarity_matrix, movie_id, top_k):
 
     return ids
 
+print(similarity_matrix)
 
-
-recommendations_n = generate_recommendations(similarity_matrix, 1895, 50)
-
+recommendations_n = generate_recommendations(similarity_matrix, 25397, 50)
+print(recommendations_n)
 recom = pd.read_csv("./recommendationsnew.csv")
 
 # %%
-def generate_recommendations(similarity_matrix, movie_id, top_k):
-    # Find the index of the movie with the given title
-    movie_index = recom[recom['movie_id'] == movie_id].index[0]
+# def generate_recommendations(similarity_matrix, movie_id, top_k):
+#     # Find the index of the movie with the given title
+#     movie_index = recom[recom['movie_id'] == movie_id].index[0]
 
-    # Get the similarity scores for the movie
-    movie_scores = similarity_matrix[movie_index]
+#     # Get the similarity scores for the movie
+#     movie_scores = similarity_matrix[movie_index]
 
-    # Sort the movies based on similarity scores
-    sorted_indices = np.argsort(movie_scores)[::-1]
-    sorted_scores = movie_scores[sorted_indices]
-    sorted_titles = recom.iloc[sorted_indices]['movie_id'].values
+#     # Sort the movies based on similarity scores
+#     sorted_indices = np.argsort(movie_scores)[::-1]
+#     sorted_scores = movie_scores[sorted_indices]
+#     sorted_titles = recom.iloc[sorted_indices]['movie_id'].values
 
-    # Select the top k recommendations
-    top_recommendations = list(
-        zip(sorted_titles[:top_k], sorted_scores[:top_k]))
-    ids = [int(item[0]) for item in top_recommendations]
+#     # Select the top k recommendations
+#     top_recommendations = list(
+#         zip(sorted_titles[:top_k], sorted_scores[:top_k]))
+#     ids = [int(item[0]) for item in top_recommendations]
 
-    return ids
+#     return ids
 
 
 app = Flask(__name__)
@@ -273,7 +292,9 @@ app = Flask(__name__)
 
 @app.route("/video/<int:movie_id>", methods=["GET"])
 def hello_world(movie_id):
-    print(generate_recommendations(similarity_matrix, movie_id, 5))
-    return jsonify(generate_recommendations(similarity_matrix, movie_id, 5))
-
+    try:
+        print(movie_id)
+        return jsonify(generate_recommendations(similarity_matrix, movie_id, 5))
+    except Exception as e:
+        print(e)
 
