@@ -99,6 +99,9 @@ movies.head()
 
 movies['overview'] = movies['overview'].apply(lambda x: x.split())
 
+mv = movies
+print(mv)
+
 movies['tags'] = movies['overview'] + movies['subject'] + \
     movies['keywords'] + movies['cast'] + movies['crew']
 
@@ -110,8 +113,8 @@ new['tags'] = new['tags'].apply(lambda x: " ".join(x))
 new.head()
 
 
-class CountVectorizer:
-    def __init__(self, lowercase=True, token_pattern=r"(?u)\b\w\w+\b"):
+class CountVectorizerNormal:
+    def __init__(self, lowercase=True, token_pattern=r"(?u)\b\w\w+\b", weight=None):
         self.lowercase = lowercase
         self.token_pattern = token_pattern
         self.vocabulary = defaultdict(int)
@@ -130,12 +133,57 @@ class CountVectorizer:
     def transform(self, raw_documents):
         rows, cols, data = [], [], []
         for i, doc in enumerate(raw_documents):
+            print(doc)
             tokens = self._tokenize(doc)
             for token in tokens:
                 if token in self.vocabulary and token not in self.stop_words:
                     rows.append(i)
                     cols.append(self.vocabulary[token])
                     data.append(1)
+        X = csr_matrix((data, (rows, cols)), shape=(
+            len(raw_documents), len(self.vocabulary)))
+        return X
+
+    def _tokenize(self, text):
+        if self.lowercase:
+            text = text.lower()
+        tokens = re.findall(self.token_pattern, text)
+        return tokens
+    
+
+from collections import defaultdict
+import re
+from scipy.sparse import csr_matrix
+
+class CountVectorizer:
+    def __init__(self, lowercase=True, token_pattern=r"(?u)\b\w\w+\b", column_weights=None, spx=0):
+        self.lowercase = lowercase
+        self.token_pattern = token_pattern
+        self.vocabulary = defaultdict(int)
+        self.stop_words = set()
+        self.column_weights = column_weights if column_weights is not None else {}
+        self.spx = spx
+
+    def fit_transform(self, raw_documents):
+        self.fit(raw_documents)
+        return self.transform(raw_documents)
+
+    def fit(self, raw_documents):
+        for doc in raw_documents:
+            tokens = self._tokenize(doc)
+            for token in tokens:
+                self.vocabulary[token] += 1
+
+    def transform(self, raw_documents):
+        rows, cols, data = [], [], []
+        for i, doc in enumerate(raw_documents):
+            tokens = self._tokenize(doc)
+            for token in tokens:
+                if token in self.vocabulary and token not in self.stop_words:
+                    weight = self.column_weights.get(token, self.spx) 
+                    rows.append(i)
+                    cols.append(self.vocabulary[token])
+                    data.append(weight)
         X = csr_matrix((data, (rows, cols)), shape=(
             len(raw_documents), len(self.vocabulary)))
         return X
@@ -184,64 +232,64 @@ class CountVectorizerJaccard:
         return tokens
 
 
-class CountVectorizerJaccardMultiColumn:
-    def __init__(self, lowercase=True, token_pattern=r"(?u)\b\w\w+\b", column_weights={}):
-        self.lowercase = lowercase
-        self.token_pattern = token_pattern
-        self.vocabulary = defaultdict(int)
-        self.column_weights = column_weights if column_weights else {}
-        self.stop_words = set({"death", "foreign", "sextrafficking"})
+# class CountVectorizerJaccardMultiColumn:
+#     def __init__(self, lowercase=True, token_pattern=r"(?u)\b\w\w+\b", column_weights={}):
+#         self.lowercase = lowercase
+#         self.token_pattern = token_pattern
+#         self.vocabulary = defaultdict(int)
+#         self.column_weights = column_weights if column_weights else {}
+#         self.stop_words = set({"death", "foreign", "sextrafficking"})
 
-    def fit_transform(self, df):
-        self.fit(df)
-        return self.transform(df)
+#     def fit_transform(self, df):
+#         self.fit(df)
+#         return self.transform(df)
 
-    def fit(self, df):
-        for _, row in df.iterrows():
-            for doc in row:
-                tokens = self._tokenize(doc)
-                for token in tokens:
-                    if row in self.column_weights:
-                        self.vocabulary[token] += self.column_weights[row]
-                    else:
-                        self.vocabulary[token] += 1
+#     def fit(self, df):
+#         for _, row in df.iterrows():
+#             for doc in row:
+#                 tokens = self._tokenize(doc)
+#                 for token in tokens:
+#                     if row in self.column_weights:
+#                         self.vocabulary[token] += self.column_weights[row]
+#                     else:
+#                         self.vocabulary[token] += 1
 
-    def transform(self, df):
-        rows, cols, data = [], [], []
-        for i, row in df.iterrows():
-            for col, weight in self.column_weights.items():
-                text = row[col]
-                tokens = self._tokenize(text)
-                for token in tokens:
-                    if token in self.vocabulary and token not in self.stop_words:
-                        # Check if i is a valid row index
-                        if i < len(df):
-                            rows.append(i)
-                            cols.append(self.vocabulary[token])
-                            data.append(weight)
-                        else:
-                            print(f"Invalid row index: {i}")
-        X = csr_matrix((data, (rows, cols)), shape=(
-            len(df), len(self.vocabulary)))
-        return X
+#     def transform(self, df):
+#         rows, cols, data = [], [], []
+#         for i, row in df.iterrows():
+#             for col, weight in self.column_weights.items():
+#                 text = row[col]
+#                 tokens = self._tokenize(text)
+#                 for token in tokens:
+#                     if token in self.vocabulary and token not in self.stop_words:
+#                         # Check if i is a valid row index
+#                         if i < len(df):
+#                             rows.append(i)
+#                             cols.append(self.vocabulary[token])
+#                             data.append(weight)
+#                         else:
+#                             print(f"Invalid row index: {i}")
+#         X = csr_matrix((data, (rows, cols)), shape=(
+#             len(df), len(self.vocabulary)))
+#         return X
 
-    def _tokenize(self, text):
-        if isinstance(text, str):
-            if self.lowercase:
-                text = text.lower()
-            tokens = re.findall(self.token_pattern, text)
-        elif isinstance(text, list):
-            tokens = []
-            for item in text:
-                if isinstance(item, str):
-                    if self.lowercase:
-                        item = item.lower()
-                    tokens.extend(re.findall(self.token_pattern, item))
-        else:
-            tokens = []
-        return tokens
-# Example usage:
-# Create a DataFrame with multiple columns
+#     def _tokenize(self, text):
+#         if isinstance(text, str):
+#             if self.lowercase:
+#                 text = text.lower()
+#             tokens = re.findall(self.token_pattern, text)
+#         elif isinstance(text, list):
+#             tokens = []
+#             for item in text:
+#                 if isinstance(item, str):
+#                     if self.lowercase:
+#                         item = item.lower()
+#                     tokens.extend(re.findall(self.token_pattern, item))
+#         else:
+#             tokens = []
+#         return tokens
+# # Example usage:
+# # Create a DataFrame with multiple columns
 
 
 # Example usage:
@@ -251,28 +299,33 @@ class CountVectorizerJaccardMultiColumn:
 df = pd.DataFrame(movies)
 
 # Define column weights (adjust as needed)
-column_weights = {'cast': 1, 'crew': 1, 'tags': 1, 'keywords': 1, 'subject': 1}
+column_weights = {'cast': 1.1, 'crew': 1.4, 'tags': 1.2, 'keywords': 1.2, 'subject': 3, "overview":1}
+column_weights_main = {'cast': .2, 'crew': 1, 'tags': 1.5, 'keywords': 1.1, 'subject': .9, "overview":1}
 
-# Initialize and use CountVectorizerJaccardMultiColumn
-vectorizer = CountVectorizerJaccardMultiColumn()
-X = vectorizer.fit_transform(df)
+# # Initialize and use CountVectorizerJaccardMultiColumn
+# vectorizer = CountVectorizerJaccardMultiColumn()
+# X = vectorizer.fit_transform(df)
 
 
-cv = CountVectorizer()
+cv = CountVectorizer(column_weights=column_weights, spx =.9)
+cvn = CountVectorizer(column_weights=column_weights_main, spx=.7)
 cvd = CountVectorizerJaccard()
 
 
-
+print(movies)
 
 # Fit the vectorizer on the 'tags' column of the 'new' DataFrame
-tfidf_matrix = cv.fit_transform(new['tags'])
+tfidf_matrix = cv.fit_transform(new["tags"])
+tfidf_matrixn = cvn.fit_transform(new["tags"]  )
 tfidf_matrixj = cv.fit_transform(
-    new['tags'])
+    new["tags"])
 
 
+print(tfidf_matrix)
 # Compute Pearson similarity matrix
 
-similarity_matrix = cosine_similarity(X, X)
+similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
+similarity_matrixn = cosine_similarity(tfidf_matrixn, tfidf_matrixn)
 
 
 num_docs, num_terms = tfidf_matrix.shape
@@ -287,40 +340,41 @@ for i in range(num_docs):
 
 
  # Since Jaccard similarity is symmetric
-def jaccard_similarity(set1, set2):
-    intersection = len(set1 & set2)
-    union = len(set1 | set2)
-    return intersection / union
+# def jaccard_similarity(set1, set2):
+#     intersection = len(set1 & set2)
+#     union = len(set1 | set2)
+#     return intersection / union
 
-# Calculate Jaccard similarities between documents
-num_docs = len(document_sets)
-jaccard_similarities = np.zeros((num_docs, num_docs))
+# # Calculate Jaccard similarities between documents
+# num_docs = len(document_sets)
+# jaccard_similarities = np.zeros((num_docs, num_docs))
 
-for i in range(num_docs):
-    for j in range(i, num_docs):
-        jaccard_similarities[i, j] = jaccard_similarity(document_sets[i], document_sets[j])
-        jaccard_similarities[j, i] = jaccard_similarities[i, j]
-# Print the Jaccard similarities
+# for i in range(num_docs):
+#     for j in range(i, num_docs):
+#         jaccard_similarities[i, j] = jaccard_similarity(document_sets[i], document_sets[j])
+#         jaccard_similarities[j, i] = jaccard_similarities[i, j]
+# # Print the Jaccard similarities
 
 
 # Calculate the cosine similarity matrix
 similarity_matrix_p = cosine_similarity(tfidf_matrix, tfidf_matrix)
+similarity_matrix_n = cosine_similarity(tfidf_matrixn, tfidf_matrixn)
 
 
 # Subtract the mean from each document's TF-IDF values
-centered_tfidf = tfidf_matrix - mean_tfidf
+# centered_tfidf = tfidf_matrix - mean_tfidf
 
-# Calculate the Pearson Correlation Coefficient (PCC) similarity matrix
+# # Calculate the Pearson Correlation Coefficient (PCC) similarity matrix
 
-print("Shape of tfidf_matrix:", tfidf_matrix.shape)
-print("Shape of mean_tfidf:", mean_tfidf.shape)
-print("Data type of tfidf_matrix:", tfidf_matrix.dtype)
-print("Data type of mean_tfidf:", mean_tfidf.dtype)
+# print("Shape of tfidf_matrix:", tfidf_matrix.shape)
+# print("Shape of mean_tfidf:", mean_tfidf.shape)
+# print("Data type of tfidf_matrix:", tfidf_matrix.dtype)
+# print("Data type of mean_tfidf:", mean_tfidf.dtype)
 # Subtract the mean from each document's TF-IDF values
 
 
 # Calculate the Pearson Correlation Coefficient (PCC) similarity matrix
-pcc_similarity_matrix = np.corrcoef(centered_tfidf)
+# pcc_similarity_matrix = np.corrcoef(centered_tfidf)
 # print(similarity_matrix)
 # print(pcc_similarity_matrix)
 def generate_recommendations(similarity_matrix, movie_id, top_k):
@@ -344,26 +398,28 @@ def generate_recommendations(similarity_matrix, movie_id, top_k):
 
 
 # Generate recommendations for a movie
-recommendations_cosine = generate_recommendations(
-    similarity_matrix, 137106, 50)
-recommendations_p = generate_recommendations(similarity_matrix_p, 137106, 50)
+# recommendations_cosine = generate_recommendations(
+#     similarity_matrix, 137106, 50)
+recommendations_perfect = generate_recommendations(similarity_matrix, 1895, 50)
+recommendations_normal = generate_recommendations(similarity_matrixn, 1895, 50)
 
 
 # Convert your arrays to NumPy arrays
-recommendations_cosine = np.array(recommendations_cosine)
+# recommendations_cosine = np.array(recommendations_cosine)
 
-recommendations_p = np.array(recommendations_p)
-
+recommendations_perfect = np.array(recommendations_perfect)
+print(recommendations_perfect)
+print(recommendations_normal)
 
 # Calculate Pearson correlation coefficient
 pearson_similarity = np.corrcoef(
-    recommendations_cosine, recommendations_p)[0, 1]
+    recommendations_normal, recommendations_perfect)[0, 1]
 
 print("Pearson Correlation Coefficient:", pearson_similarity)
 
-# Define a list of items (e.g., item IDs or item features)
-items = recommendations_cosine
-print(items)
+# # Define a list of items (e.g., item IDs or item features)
+# items = recommendations_cosine
+# print(items)
 # Define the number of synthetic users and the desired interaction rate
 # num_users = 100
 # interaction_rate = .9  # Adjust as needed (percentage of interactions)
@@ -393,59 +449,59 @@ num_items = 500
 interaction_rate = 0.2
 
 # Initialize a list to store synthetic interactions
-synthetic_interactions = []
+# synthetic_interactions = []
 
-# Generate synthetic interactions for each user
-for user_id in range(1, num_users + 1):
-    # Randomly choose the number of interactions for this user
-    num_interactions = int(num_items * interaction_rate)
+# # Generate synthetic interactions for each user
+# for user_id in range(1, num_users + 1):
+#     # Randomly choose the number of interactions for this user
+#     num_interactions = int(num_items * interaction_rate)
     
-    # Randomly sample items for interactions (using item IDs)
-    user_interactions = random.sample(range(1, num_items + 1), num_interactions)
+#     # Randomly sample items for interactions (using item IDs)
+#     user_interactions = random.sample(range(1, num_items + 1), num_interactions)
     
-    # Append the user's interactions to the list
-    synthetic_interactions.append(user_interactions)
+#     # Append the user's interactions to the list
+#     synthetic_interactions.append(user_interactions)
 
-# Print the synthetic interactions
-for user_id, interactions in enumerate(synthetic_interactions, start=1):
-    print(f"User {user_id} interactions: {interactions}")
+# # Print the synthetic interactions
+# for user_id, interactions in enumerate(synthetic_interactions, start=1):
+#     print(f"User {user_id} interactions: {interactions}")
 
 
 # Assuming 'synthetic_interactions' is a dictionary of synthetic user interactions
 # 'recommended_items' is a dictionary of recommended items where keys are user IDs and values are lists of recommended item IDs.
 
-total_average_precision = 0
-total_users = len(synthetic_interactions)
+# total_average_precision = 0
+# total_users = len(synthetic_interactions)
 
-# Iterate through each user (assuming each inner list represents a user's interactions)
-for i in range(total_users):
-    actual_interactions_list = synthetic_interactions[i]
-    recommended_video_ids = recommendations_cosine[i]
+# # Iterate through each user (assuming each inner list represents a user's interactions)
+# for i in range(total_users):
+#     actual_interactions_list = synthetic_interactions[i]
+#     recommended_video_ids = recommendations_cosine[i]
 
-    # Initialize variables for this user's AP calculation
-    num_relevant_recommendations = 0
-    precision_sum = 0
+#     # Initialize variables for this user's AP calculation
+#     num_relevant_recommendations = 0
+#     precision_sum = 0
 
-    # Calculate Average Precision (AP) for this user
-    for j, recommended_video_id in enumerate(recommended_video_ids):
-        if recommended_video_id in actual_interactions_list:
-            num_relevant_recommendations += 1
-            precision = num_relevant_recommendations / (j + 1)
-            precision_sum += precision
+#     # Calculate Average Precision (AP) for this user
+#     for j, recommended_video_id in enumerate(recommended_video_ids):
+#         if recommended_video_id in actual_interactions_list:
+#             num_relevant_recommendations += 1
+#             precision = num_relevant_recommendations / (j + 1)
+#             precision_sum += precision
 
-    # Calculate the Average Precision (AP) for this user
-    if num_relevant_recommendations > 0:
-        average_precision = precision_sum / num_relevant_recommendations
-        total_average_precision += average_precision
+#     # Calculate the Average Precision (AP) for this user
+#     if num_relevant_recommendations > 0:
+#         average_precision = precision_sum / num_relevant_recommendations
+#         total_average_precision += average_precision
 
-# Calculate the Mean Average Precision (MAP) for the entire dataset
-mean_average_precision = total_average_precision / total_users
+# # Calculate the Mean Average Precision (MAP) for the entire dataset
+# mean_average_precision = total_average_precision / total_users
 
-# Print the Mean Average Precision (MAP)
-print("Mean Average Precision (MAP):", mean_average_precision)
-accuracy = np.corrcoef(recommendations, recommendations_cosine)[0, 1]
+# # Print the Mean Average Precision (MAP)
+# print("Mean Average Precision (MAP):", mean_average_precision)
+# accuracy = np.corrcoef(recommendations, recommendations_cosine)[0, 1]
 
-print(f"Accuracy: {accuracy:.2f}%")
+# print(f"Accuracy: {accuracy:.2f}%")
 
 app = Flask(__name__)
 
