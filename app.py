@@ -112,7 +112,7 @@ movies.head()
 movies['overview'] = movies['overview'].apply(lambda x: x.split())
 
 mv = movies
-print(mv)
+
 
 movies['tags'] = movies['overview'] + movies['subject'] + \
     movies['keywords'] + movies['cast'] + movies['crew']
@@ -282,15 +282,13 @@ cvn = CountVectorizerAllColumns(column_weights=column_weights_main)
 
 # Fit the vectorizer on the 'tags' column of the 'new' DataFrame
 
-tfidf_matrixn = cvn.fit_transform(movies)
+tfidf_matrix = cvn.fit_transform(movies)
 
 
 
-print(tfidf_matrix)
 # Compute Pearson similarity matrix
 
 similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
-similarity_matrixn = cosine_similarity(tfidf_matrixn, tfidf_matrixn)
 
 
 num_docs, num_terms = tfidf_matrix.shape
@@ -322,7 +320,6 @@ for i in range(num_docs):
 
 # Calculate the cosine similarity matrix
 similarity_matrix_p = cosine_similarity(tfidf_matrix, tfidf_matrix)
-similarity_matrix_n = cosine_similarity(tfidf_matrixn, tfidf_matrixn)
 
 
 # Subtract the mean from each document's TF-IDF values
@@ -357,15 +354,28 @@ def generate_recommendations(similarity_matrix, movie_id, top_k):
     top_recommendations = list(
         zip(sorted_titles[:top_k], sorted_scores[:top_k]))
     ids = [int(item[0]) for item in top_recommendations]
+    
+    data = new[new["movie_id"].isin(ids)].to_dict()
+    titles = set(data.keys())
+    all_keys = set()
+    print(data)
+    for title in titles:
+        all_keys.update(data[title].keys())
 
-    return ids
+# Convert to the desired format dynamically
+    result = [
+    {key: {title: data[title].get(key, None) for title in titles}}
+    for key in all_keys
+    ]
 
+# Convert to the desired format dynamically
+    
+    return result
 
 # Generate recommendations for a movie
 # recommendations_cosine = generate_recommendations(
 #     similarity_matrix, 137106, 50)
 recommendations_perfect = generate_recommendations(similarity_matrix, 1895, 50)
-recommendations_normal = generate_recommendations(similarity_matrixn, 1895, 50)
 
 num_users = 100
 num_items = 500
@@ -379,5 +389,5 @@ app = Flask(__name__)
 
 @app.route("/video/<int:movie_id>", methods=["GET"])
 def hello_world(movie_id):
-    print(generate_recommendations(similarity_matrix, movie_id, 5))
+    
     return jsonify(generate_recommendations(similarity_matrix, movie_id, 5))
